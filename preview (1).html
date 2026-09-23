@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Flappy Bird - Juego Web</title>
+<style>
+*{box-sizing:border-box} body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(#172554,#0f172a);font-family:Arial,sans-serif;overflow:hidden}
+#wrap{position:relative;width:min(94vw,430px);height:min(94vh,700px);border:5px solid #111827;border-radius:18px;overflow:hidden;box-shadow:0 18px 50px #0008;background:#70c5ce}
+canvas{width:100%;height:100%;display:block;image-rendering:auto}
+#hud{position:absolute;top:12px;left:0;right:0;display:flex;justify-content:space-between;padding:0 16px;color:white;font-weight:900;font-size:24px;text-shadow:2px 2px #0008;pointer-events:none}
+#panel{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.card{background:#fff;border:4px solid #111827;border-radius:16px;padding:22px;box-shadow:0 10px 0 #111827;pointer-events:auto}
+h1{margin:0 0 10px;font-size:34px;color:#f59e0b;text-shadow:2px 2px #111827}
+button{border:0;border-radius:10px;padding:12px 22px;background:#22c55e;color:white;font-weight:900;font-size:18px;cursor:pointer;box-shadow:0 5px 0 #15803d}
+button:active{transform:translateY(4px);box-shadow:0 1px 0 #15803d}
+.small{color:#475569;margin:8px 0 16px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="wrap">
+<canvas id="game" width="420" height="700"></canvas>
+<div id="hud"><span id="score">0</span><span id="best">Récord: 0</span></div>
+<div id="panel">
+  <div class="card" id="card">
+    <h1>FLAPPY BIRD</h1>
+    <div class="small">Haz clic o pulsa ESPACIO para volar<br>Evita las tuberías y consigue la mayor puntuación.</div>
+    <button id="start">JUGAR</button>
+  </div>
+</div>
+</div>
+<script>
+const c=document.getElementById('game'),x=c.getContext('2d');
+const W=420,H=700,ground=62;
+let bird,pipes,score,best=Number(localStorage.flappyBest||0),state='menu',last=0,spawn=0;
+document.getElementById('best').textContent='Récord: '+best;
+
+function reset(){
+ bird={x:105,y:300,r:17,vy:0,rot:0,frame:0};
+ pipes=[]; score=0; spawn=0;
+ document.getElementById('score').textContent='0';
+}
+function flap(){
+ if(state==='menu'||state==='over'){reset();state='play';document.getElementById('panel').classList.add('hidden')}
+ bird.vy=-430;
+}
+function pipe(){
+ const gap=158-Math.min(score*1.5,45), min=100,max=H-ground-gap-100;
+ const top=min+Math.random()*(max-min);
+ pipes.push({x:W+30,w:70,top,gap,passed:false});
+}
+function hit(p){
+ const bx=bird.x,by=bird.y,r=bird.r;
+ if(bx+r>p.x&&bx-r<p.x+p.w&&(by-r<p.top||by+r>p.top+p.gap))return true;
+ return by-r<0||by+r>H-ground;
+}
+function update(dt){
+ bird.vy+=1150*dt; bird.y+=bird.vy*dt; bird.rot=Math.max(-.5,Math.min(1.2,bird.vy/650)); bird.frame+=dt*12;
+ spawn-=dt;
+ if(spawn<=0){pipe();spawn=.0+1.55-Math.min(score*.01,.25)}
+ for(const p of pipes){p.x-=(185+score*4)*dt;if(!p.passed&&p.x+p.w<bird.x){p.passed=true;score++;document.getElementById('score').textContent=score}}
+ pipes=pipes.filter(p=>p.x+p.w>-20);
+ for(const p of pipes)if(hit(p)){state='over';best=Math.max(best,score);localStorage.flappyBest=best;showOver();return}
+}
+function showOver(){
+ document.getElementById('best').textContent='Récord: '+best;
+ const card=document.getElementById('card');
+ card.innerHTML='<h1>¡FIN!</h1><div class="small">Puntuación: <b>'+score+'</b><br>Récord: <b>'+best+'</b></div><button id="again">JUGAR DE NUEVO</button>';
+ document.getElementById('panel').classList.remove('hidden');
+ document.getElementById('again').onclick=flap;
+}
+function sky(){
+ let g=x.createLinearGradient(0,0,0,H);g.addColorStop(0,'#55c7df');g.addColorStop(1,'#b7edf2');x.fillStyle=g;x.fillRect(0,0,W,H);
+ x.fillStyle='#fff9'; for(let i=0;i<7;i++){let xx=(i*90+35)%500,yy=80+(i%3)*75;x.beginPath();x.arc(xx,yy,20,0,7);x.arc(xx+22,yy+3,25,0,7);x.arc(xx+45,yy,17,0,7);x.fill()}
+}
+function drawPipe(p){
+ const cap=10;
+ x.fillStyle='#2e9d45';x.fillRect(p.x,0,p.w,p.top);x.fillRect(p.x,p.top-cap,p.w,cap);
+ x.fillRect(p.x,p.top+p.gap,p.w,H-ground-p.top-p.gap);x.fillRect(p.x,p.top+p.gap,p.w,p.top*0+cap);
+ x.fillStyle='#52c75c';x.fillRect(p.x+8,0,10,p.top-cap);x.fillRect(p.x+8,p.top+p.gap+cap,10,H-ground-p.top-p.gap-cap);
+}
+function drawBird(){
+ x.save();x.translate(bird.x,bird.y);x.rotate(bird.rot);
+ x.fillStyle='#f7c948';x.beginPath();x.ellipse(0,0,22,17,0,0,7);x.fill();
+ x.fillStyle='#e9a91b';x.beginPath();x.ellipse(-7,6,13,8,Math.sin(bird.frame)*.25,0,7);x.fill();
+ x.fillStyle='white';x.beginPath();x.arc(10,-7,7,0,7);x.fill();x.fillStyle='#111';x.beginPath();x.arc(12,-7,3,0,7);x.fill();
+ x.fillStyle='#f97316';x.beginPath();x.moveTo(19,-1);x.lineTo(34,4);x.lineTo(19,8);x.fill();x.restore();
+}
+function draw(){
+ sky();
+ for(const p of pipes)drawPipe(p);
+ x.fillStyle='#ded895';x.fillRect(0,H-ground,W,ground);x.fillStyle='#b5a94b';
+ for(let i=0;i<W;i+=28)x.fillRect(i,H-ground,14,8);
+ drawBird();
+}
+function loop(t){
+ const dt=Math.min((t-last)/1000||0,.035);last=t;
+ if(state==='play')update(dt);
+ draw();requestAnimationFrame(loop);
+}
+document.getElementById('start').onclick=flap;
+addEventListener('keydown',e=>{if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();flap()}});
+c.addEventListener('pointerdown',flap);
+reset();requestAnimationFrame(loop);
+</script>
+</body>
+</html>
